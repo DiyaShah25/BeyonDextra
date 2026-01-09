@@ -10,9 +10,13 @@ import About from "./pages/About";
 import Features from "./pages/Features";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
+import LessonPlayer from "./pages/LessonPlayer";
 import Dashboard from "./pages/Dashboard";
 import Community from "./pages/Community";
 import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
+import Gamification from "./pages/Gamification";
+import Admin from "./pages/Admin";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
@@ -33,8 +37,12 @@ const App = () => (
               <Route path="/features" element={<Features />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/courses/:courseId" element={<CourseDetail />} />
+              <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonPlayer />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/community" element={<Community />} />
+              <Route path="/gamification" element={<Gamification />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
