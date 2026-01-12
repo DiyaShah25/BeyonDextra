@@ -18,7 +18,7 @@ const navLinks = [
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, profile, role, isAuthenticated, logout } = useAuth();
   const location = useLocation();
 
   return (
@@ -70,7 +70,7 @@ export function Header() {
                   <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                     <User className="w-4 h-4 text-primary" aria-hidden="true" />
                   </div>
-                  <span className="hidden md:block font-medium">{user?.name}</span>
+                  <span className="hidden md:block font-medium">{profile?.full_name || user?.email}</span>
                   <ChevronDown className="w-4 h-4" aria-hidden="true" />
                 </button>
 
@@ -84,9 +84,9 @@ export function Header() {
                       role="menu"
                     >
                       <div className="p-3 border-b border-border">
-                        <p className="font-medium">{user?.name}</p>
+                        <p className="font-medium">{profile?.full_name || 'User'}</p>
                         <p className="text-sm text-muted-foreground">{user?.email}</p>
-                        <span className="badge-primary mt-2 text-xs capitalize">{user?.role}</span>
+                        <span className="badge-primary mt-2 text-xs capitalize">{role}</span>
                       </div>
                       <div className="p-2">
                         <Link
