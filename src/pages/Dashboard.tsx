@@ -38,10 +38,10 @@ const upcomingEvents = [
 ];
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
 
   const xpToNextLevel = 3000;
-  const currentXp = user?.xp || 2450;
+  const currentXp = profile?.xp || 2450;
   const progressPercent = (currentXp / xpToNextLevel) * 100;
 
   return (
@@ -55,7 +55,7 @@ export default function DashboardPage() {
             className="mb-12"
           >
             <h1 className="text-3xl sm:text-4xl font-display font-bold mb-2">
-              Welcome back, <span className="text-gradient">{user?.name || 'Learner'}</span>!
+              Welcome back, <span className="text-gradient">{profile?.full_name || 'Learner'}</span>!
             </h1>
             <p className="text-muted-foreground">Continue your learning journey where you left off.</p>
           </motion.div>
@@ -82,7 +82,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="card-elevated text-center">
                   <Trophy className="w-8 h-8 text-accent mx-auto mb-2" />
-                  <p className="text-2xl font-bold">{user?.badges.length || 3}</p>
+                  <p className="text-2xl font-bold">3</p>
                   <p className="text-sm text-muted-foreground">Badges Earned</p>
                 </div>
                 <div className="card-elevated text-center">
@@ -184,7 +184,7 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold">Level Progress</h3>
-                  <span className="badge-primary">Level {user?.level || 12}</span>
+                  <span className="badge-primary">Level {profile?.level || 12}</span>
                 </div>
                 <div className="progress-bar mb-2">
                   <div 
