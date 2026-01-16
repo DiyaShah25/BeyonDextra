@@ -19,6 +19,7 @@ import Gamification from "./pages/Gamification";
 import Admin from "./pages/Admin";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AIChat from "./pages/AIChat";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/ai-chat" element={<AIChat />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
