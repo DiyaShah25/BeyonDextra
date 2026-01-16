@@ -13,6 +13,7 @@ const navLinks = [
   { href: '/features', label: 'Features' },
   { href: '/courses', label: 'Courses' },
   { href: '/community', label: 'Community' },
+  { href: '/ai-chat', label: 'AI Chat' },
 ];
 
 export function Header() {
