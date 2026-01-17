@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Plus, Trash2, MessageSquare, Bot, User, Loader2, Menu, X } from 'lucide-react';
+import { Send, Plus, Trash2, MessageSquare, Bot, User, Loader2, Menu, X, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,6 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Layout } from '@/components/layout/Layout';
+import { VoiceControls } from '@/components/chat/VoiceControls';
+import { useVoice } from '@/hooks/useVoice';
 
 interface Message {
   id: string;
@@ -38,6 +40,17 @@ const AIChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [loadingConversations, setLoadingConversations] = useState(true);
+
+  const {
+    isPlaying,
+    isRecording,
+    isProcessing,
+    playText,
+    stopPlaying,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+  } = useVoice();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -99,7 +112,6 @@ const AIChat = () => {
 
       if (error) throw error;
       
-      // Type cast the data to ensure role is properly typed
       const typedMessages: Message[] = (data || []).map(msg => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
@@ -167,8 +179,9 @@ const AIChat = () => {
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || !user) return;
+  const sendMessage = async (messageText?: string) => {
+    const textToSend = messageText || inputMessage.trim();
+    if (!textToSend || isLoading || !user) return;
 
     let conversationId = currentConversation?.id;
 
@@ -177,7 +190,7 @@ const AIChat = () => {
       try {
         const { data, error } = await supabase
           .from('conversations')
-          .insert({ user_id: user.id, title: inputMessage.slice(0, 50) })
+          .insert({ user_id: user.id, title: textToSend.slice(0, 50) })
           .select()
           .single();
 
@@ -196,7 +209,6 @@ const AIChat = () => {
       }
     }
 
-    const userMessage = inputMessage.trim();
     setInputMessage('');
     setIsLoading(true);
 
@@ -204,7 +216,7 @@ const AIChat = () => {
     const tempUserMessage: Message = {
       id: `temp-user-${Date.now()}`,
       role: 'user',
-      content: userMessage,
+      content: textToSend,
       created_at: new Date().toISOString(),
     };
     setMessages(prev => [...prev, tempUserMessage]);
@@ -216,14 +228,13 @@ const AIChat = () => {
         .insert({
           conversation_id: conversationId,
           role: 'user',
-          content: userMessage,
+          content: textToSend,
         })
         .select()
         .single();
 
       if (saveError) throw saveError;
 
-      // Update the temp message with the real one
       const typedSavedUserMessage: Message = {
         id: savedUserMessage.id,
         role: savedUserMessage.role as 'user' | 'assistant',
@@ -238,7 +249,7 @@ const AIChat = () => {
       // Call AI edge function
       const { data: aiData, error: aiError } = await supabase.functions.invoke('ai-chat', {
         body: {
-          message: userMessage,
+          message: textToSend,
           conversationId,
           messages: messages.map(m => ({ role: m.role, content: m.content })),
         },
@@ -276,11 +287,11 @@ const AIChat = () => {
       if (messages.length === 0) {
         await supabase
           .from('conversations')
-          .update({ title: userMessage.slice(0, 50) })
+          .update({ title: textToSend.slice(0, 50) })
           .eq('id', conversationId);
         
         setConversations(prev => prev.map(c => 
-          c.id === conversationId ? { ...c, title: userMessage.slice(0, 50) } : c
+          c.id === conversationId ? { ...c, title: textToSend.slice(0, 50) } : c
         ));
       }
     } catch (error) {
@@ -290,7 +301,6 @@ const AIChat = () => {
         description: 'Failed to send message. Please try again.',
         variant: 'destructive',
       });
-      // Remove the temp message on error
       setMessages(prev => prev.filter(m => m.id !== tempUserMessage.id));
     } finally {
       setIsLoading(false);
@@ -301,6 +311,67 @@ const AIChat = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
+    }
+  };
+
+  const getLastAssistantMessage = () => {
+    const assistantMessages = messages.filter(m => m.role === 'assistant');
+    return assistantMessages[assistantMessages.length - 1];
+  };
+
+  const handlePlayLastMessage = async () => {
+    const lastMessage = getLastAssistantMessage();
+    if (lastMessage) {
+      try {
+        await playText(lastMessage.content);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to play audio. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  const handlePlayMessage = async (content: string) => {
+    try {
+      await playText(content);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to play audio. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleStartRecording = async () => {
+    try {
+      await startRecording();
+    } catch (error) {
+      toast({
+        title: 'Microphone access denied',
+        description: 'Please allow microphone access to use voice input.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleStopRecording = async () => {
+    try {
+      const transcription = await stopRecording();
+      if (transcription) {
+        setInputMessage(transcription);
+        // Optionally auto-send
+        // sendMessage(transcription);
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to transcribe audio. Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -398,6 +469,18 @@ const AIChat = () => {
               <Bot className="h-5 w-5 text-primary" />
               <h1 className="font-semibold">BeyonDextra AI</h1>
             </div>
+            <div className="ml-auto">
+              <VoiceControls
+                isPlaying={isPlaying}
+                isRecording={isRecording}
+                isProcessing={isProcessing}
+                onPlayLastMessage={handlePlayLastMessage}
+                onStopPlaying={stopPlaying}
+                onStartRecording={handleStartRecording}
+                onStopRecording={handleStopRecording}
+                hasLastAssistantMessage={!!getLastAssistantMessage()}
+              />
+            </div>
           </header>
 
           {/* Messages */}
@@ -435,6 +518,18 @@ const AIChat = () => {
                       }`}
                     >
                       <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                      {message.role === 'assistant' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 h-6 px-2 text-xs opacity-60 hover:opacity-100"
+                          onClick={() => handlePlayMessage(message.content)}
+                          disabled={isPlaying}
+                        >
+                          <Volume2 className="h-3 w-3 mr-1" />
+                          Listen
+                        </Button>
+                      )}
                     </div>
                     {message.role === 'user' && (
                       <div className="h-8 w-8 rounded-full bg-secondary/20 flex items-center justify-center shrink-0">
@@ -474,12 +569,12 @@ const AIChat = () => {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type your message..."
-                disabled={isLoading}
-                className="flex-1"
+                placeholder={isRecording ? 'Recording... Click stop to transcribe' : 'Type your message...'}
+                disabled={isLoading || isRecording}
+                className={`flex-1 ${isRecording ? 'border-destructive bg-destructive/10' : ''}`}
               />
               <Button
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={!inputMessage.trim() || isLoading}
                 size="icon"
               >

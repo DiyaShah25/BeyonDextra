@@ -1,8 +1,9 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { 
   Clock, 
   Users, 
@@ -16,90 +17,94 @@ import {
   Video,
   FileText,
   HelpCircle,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
-
-// Mock course data
-const courseData = {
-  id: 'web-dev-101',
-  title: 'Web Development Fundamentals',
-  description: 'Master HTML, CSS, and JavaScript with full accessibility support and hands-on projects. This comprehensive course is designed to take you from complete beginner to confident web developer.',
-  instructor: 'Sarah Chen',
-  instructorBio: 'Senior Web Developer with 10+ years of experience teaching accessible web development.',
-  duration: '12 hours',
-  students: 3420,
-  rating: 4.9,
-  reviews: 428,
-  level: 'beginner',
-  category: 'Technology',
-  lastUpdated: 'December 2024',
-  language: 'English',
-  accessibilityFeatures: [
-    'Closed Captions (CC)',
-    'Sign Language Interpretation',
-    'Audio Descriptions',
-    'Full Transcripts',
-    'Keyboard Navigation',
-    'Screen Reader Optimized',
-  ],
-  whatYouLearn: [
-    'Build responsive websites from scratch',
-    'Master HTML5 semantic elements for accessibility',
-    'Create stunning layouts with CSS Flexbox and Grid',
-    'Add interactivity with JavaScript',
-    'Implement accessibility best practices',
-    'Deploy your projects to the web',
-  ],
-  modules: [
-    {
-      id: 'mod-1',
-      title: 'Introduction to Web Development',
-      duration: '1.5 hours',
-      lessons: [
-        { id: 'les-1', title: 'Welcome & Course Overview', type: 'video', duration: '10 min', free: true },
-        { id: 'les-2', title: 'How the Web Works', type: 'video', duration: '15 min', free: true },
-        { id: 'les-3', title: 'Setting Up Your Development Environment', type: 'video', duration: '20 min', free: false },
-        { id: 'les-4', title: 'Module Quiz', type: 'quiz', duration: '10 min', free: false },
-      ],
-    },
-    {
-      id: 'mod-2',
-      title: 'HTML Fundamentals',
-      duration: '3 hours',
-      lessons: [
-        { id: 'les-5', title: 'HTML Document Structure', type: 'video', duration: '25 min', free: false },
-        { id: 'les-6', title: 'Text & Typography Elements', type: 'video', duration: '30 min', free: false },
-        { id: 'les-7', title: 'Links & Navigation', type: 'video', duration: '25 min', free: false },
-        { id: 'les-8', title: 'Images & Media', type: 'video', duration: '30 min', free: false },
-        { id: 'les-9', title: 'Forms & Input Elements', type: 'video', duration: '35 min', free: false },
-        { id: 'les-10', title: 'Semantic HTML for Accessibility', type: 'video', duration: '30 min', free: false },
-        { id: 'les-11', title: 'HTML Practice Project', type: 'project', duration: '45 min', free: false },
-      ],
-    },
-    {
-      id: 'mod-3',
-      title: 'CSS Styling',
-      duration: '4 hours',
-      lessons: [
-        { id: 'les-12', title: 'CSS Basics & Selectors', type: 'video', duration: '30 min', free: false },
-        { id: 'les-13', title: 'Colors & Typography', type: 'video', duration: '25 min', free: false },
-        { id: 'les-14', title: 'Box Model & Layout', type: 'video', duration: '35 min', free: false },
-        { id: 'les-15', title: 'Flexbox Deep Dive', type: 'video', duration: '45 min', free: false },
-        { id: 'les-16', title: 'CSS Grid Mastery', type: 'video', duration: '45 min', free: false },
-        { id: 'les-17', title: 'Responsive Design', type: 'video', duration: '40 min', free: false },
-      ],
-    },
-  ],
-};
+import { useCourseData } from '@/hooks/useCourseData';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 const lessonTypeIcons = {
   video: Video,
   quiz: HelpCircle,
   project: FileText,
+  text: FileText,
 };
 
 export default function CourseDetailPage() {
   const { courseId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { 
+    course, 
+    enrollment, 
+    lessonProgress, 
+    loading, 
+    enrollInCourse,
+    getCompletedLessonsCount,
+    getTotalLessonsCount,
+  } = useCourseData(courseId);
+
+  const handleEnroll = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    const { error } = await enrollInCourse();
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Enrolled!',
+        description: 'You are now enrolled in this course.',
+      });
+    }
+  };
+
+  const handleLessonClick = (lessonId: string, moduleIndex: number, lessonIndex: number) => {
+    if (!enrollment && !user) {
+      toast({
+        title: 'Enroll to access',
+        description: 'Please enroll in the course to access lessons.',
+      });
+      return;
+    }
+    navigate(`/courses/${courseId}/lessons/${lessonId}`);
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!course) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-12 text-center">
+          <h1 className="text-2xl font-bold mb-4">Course Not Found</h1>
+          <p className="text-muted-foreground mb-6">The course you're looking for doesn't exist.</p>
+          <Button asChild>
+            <Link to="/courses">Browse Courses</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  const totalLessons = getTotalLessonsCount();
+  const completedLessons = getCompletedLessonsCount();
+  const progressPercent = enrollment?.progress_percent || 0;
 
   return (
     <Layout>
@@ -117,73 +122,97 @@ export default function CourseDetailPage() {
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2">
               <div className="flex items-center gap-3 mb-4">
-                <span className="badge-primary">{courseData.category}</span>
-                <span className="badge-success">{courseData.level}</span>
+                <span className="badge-primary">{course.difficulty || 'All Levels'}</span>
+                {course.is_published && (
+                  <span className="badge-success">Published</span>
+                )}
               </div>
               
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold mb-4">
-                {courseData.title}
+                {course.title}
               </h1>
               
               <p className="text-lg text-muted-foreground mb-6">
-                {courseData.description}
+                {course.description}
               </p>
 
               <div className="flex flex-wrap items-center gap-4 text-sm mb-6">
-                <span className="flex items-center gap-1">
-                  <Star className="w-4 h-4 text-secondary fill-secondary" />
-                  <strong>{courseData.rating}</strong>
-                  <span className="text-muted-foreground">({courseData.reviews} reviews)</span>
-                </span>
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Users className="w-4 h-4" />
-                  {courseData.students.toLocaleString()} students
-                </span>
                 <span className="flex items-center gap-1 text-muted-foreground">
                   <Clock className="w-4 h-4" />
-                  {courseData.duration}
+                  {course.duration_hours || 0} hours
+                </span>
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <BookOpen className="w-4 h-4" />
+                  {totalLessons} lessons
                 </span>
               </div>
 
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                  👩‍💻
+              {enrollment && (
+                <div className="bg-card p-4 rounded-lg border border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Your Progress</span>
+                    <span className="text-sm text-muted-foreground">
+                      {completedLessons} / {totalLessons} lessons
+                    </span>
+                  </div>
+                  <Progress value={progressPercent} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {progressPercent}% complete
+                  </p>
                 </div>
-                <div>
-                  <p className="font-medium">{courseData.instructor}</p>
-                  <p className="text-sm text-muted-foreground">{courseData.instructorBio}</p>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Enrollment Card */}
             <div className="lg:col-span-1">
               <div className="card-elevated sticky top-24">
-                <div className="aspect-video bg-muted rounded-lg mb-6 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20" />
-                  <button className="relative z-10 p-4 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-110 transition-transform">
-                    <Play className="w-8 h-8" />
-                  </button>
-                </div>
+                {course.thumbnail_url ? (
+                  <img 
+                    src={course.thumbnail_url} 
+                    alt={course.title}
+                    className="aspect-video bg-muted rounded-lg mb-6 object-cover"
+                  />
+                ) : (
+                  <div className="aspect-video bg-muted rounded-lg mb-6 flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20" />
+                    <Play className="w-12 h-12 text-primary relative z-10" />
+                  </div>
+                )}
                 
-                <p className="text-3xl font-bold mb-2">Free</p>
-                <p className="text-muted-foreground text-sm mb-6">Full access to all course content</p>
+                <p className="text-3xl font-bold mb-2">
+                  {course.price && course.price > 0 ? `$${course.price}` : 'Free'}
+                </p>
+                <p className="text-muted-foreground text-sm mb-6">
+                  {course.price && course.price > 0 ? 'One-time purchase' : 'Full access to all content'}
+                </p>
 
-                <Button className="w-full mb-4" size="lg">
-                  Enroll Now - It's Free
-                </Button>
-                <Button variant="outline" className="w-full" size="lg">
-                  Add to Wishlist
-                </Button>
+                {enrollment ? (
+                  <Button 
+                    className="w-full mb-4" 
+                    size="lg"
+                    onClick={() => {
+                      const firstLesson = course.modules[0]?.lessons[0];
+                      if (firstLesson) {
+                        navigate(`/courses/${courseId}/lessons/${firstLesson.id}`);
+                      }
+                    }}
+                  >
+                    Continue Learning
+                  </Button>
+                ) : (
+                  <Button className="w-full mb-4" size="lg" onClick={handleEnroll}>
+                    {course.price && course.price > 0 ? 'Buy Now' : "Enroll Now - It's Free"}
+                  </Button>
+                )}
 
                 <div className="mt-6 pt-6 border-t border-border space-y-3 text-sm">
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span>{courseData.duration} of content</span>
+                    <span>{course.duration_hours || 0} hours of content</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-muted-foreground" />
-                    <span>{courseData.modules.reduce((acc, m) => acc + m.lessons.length, 0)} lessons</span>
+                    <span>{totalLessons} lessons</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Award className="w-4 h-4 text-muted-foreground" />
@@ -199,84 +228,63 @@ export default function CourseDetailPage() {
       {/* Course Content */}
       <section className="section-padding">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-3 gap-12">
-            <div className="lg:col-span-2 space-y-12">
-              {/* What You'll Learn */}
-              <div>
-                <h2 className="text-2xl font-display font-bold mb-6">What You'll Learn</h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {courseData.whatYouLearn.map((item) => (
-                    <div key={item} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="lg:max-w-3xl">
+            <h2 className="text-2xl font-display font-bold mb-6">Course Content</h2>
+            <p className="text-muted-foreground mb-6">
+              {course.modules.length} modules • {totalLessons} lessons • {course.duration_hours || 0} hours total
+            </p>
 
-              {/* Accessibility Features */}
-              <div>
-                <h2 className="text-2xl font-display font-bold mb-6">Accessibility Features</h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {courseData.accessibilityFeatures.map((feature) => (
-                    <div key={feature} className="flex items-center gap-3 p-3 rounded-lg bg-primary/5">
-                      <CheckCircle2 className="w-5 h-5 text-primary" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Course Content */}
-              <div>
-                <h2 className="text-2xl font-display font-bold mb-6">Course Content</h2>
-                <p className="text-muted-foreground mb-6">
-                  {courseData.modules.length} modules • {courseData.modules.reduce((acc, m) => acc + m.lessons.length, 0)} lessons • {courseData.duration} total
-                </p>
-
-                <div className="space-y-4">
-                  {courseData.modules.map((module, idx) => (
-                    <details key={module.id} className="group card-elevated" open={idx === 0}>
-                      <summary className="flex items-center justify-between cursor-pointer list-none">
-                        <div className="flex items-center gap-3">
-                          <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-                            {idx + 1}
-                          </span>
-                          <div>
-                            <h3 className="font-semibold">{module.title}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {module.lessons.length} lessons • {module.duration}
-                            </p>
-                          </div>
-                        </div>
-                        <ChevronDown className="w-5 h-5 text-muted-foreground group-open:rotate-180 transition-transform" />
-                      </summary>
-                      
-                      <div className="mt-4 pt-4 border-t border-border space-y-2">
-                        {module.lessons.map((lesson) => {
-                          const Icon = lessonTypeIcons[lesson.type as keyof typeof lessonTypeIcons] || Video;
-                          return (
-                            <div 
-                              key={lesson.id} 
-                              className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                            >
-                              <Icon className="w-4 h-4 text-muted-foreground" />
-                              <span className="flex-1">{lesson.title}</span>
-                              {lesson.free && (
-                                <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded-full">
-                                  Free
-                                </span>
-                              )}
-                              {!lesson.free && <Lock className="w-4 h-4 text-muted-foreground" />}
-                              <span className="text-sm text-muted-foreground">{lesson.duration}</span>
-                            </div>
-                          );
-                        })}
+            <div className="space-y-4">
+              {course.modules.map((module, moduleIdx) => (
+                <details key={module.id} className="group card-elevated" open={moduleIdx === 0}>
+                  <summary className="flex items-center justify-between cursor-pointer list-none">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                        {moduleIdx + 1}
+                      </span>
+                      <div>
+                        <h3 className="font-semibold">{module.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {module.lessons.length} lessons
+                        </p>
                       </div>
-                    </details>
-                  ))}
-                </div>
-              </div>
+                    </div>
+                    <ChevronDown className="w-5 h-5 text-muted-foreground group-open:rotate-180 transition-transform" />
+                  </summary>
+                  
+                  <div className="mt-4 pt-4 border-t border-border space-y-2">
+                    {module.lessons.map((lesson, lessonIdx) => {
+                      const Icon = lessonTypeIcons[lesson.content_type as keyof typeof lessonTypeIcons] || Video;
+                      const isCompleted = lessonProgress.get(lesson.id)?.completed;
+                      const isLocked = !enrollment && !user;
+                      
+                      return (
+                        <motion.div 
+                          key={lesson.id}
+                          whileHover={{ x: 4 }}
+                          className={`flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer ${
+                            isCompleted ? 'bg-success/10' : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => handleLessonClick(lesson.id, moduleIdx, lessonIdx)}
+                        >
+                          {isCompleted ? (
+                            <CheckCircle2 className="w-4 h-4 text-success" />
+                          ) : (
+                            <Icon className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <span className="flex-1">{lesson.title}</span>
+                          {isLocked && <Lock className="w-4 h-4 text-muted-foreground" />}
+                          {lesson.duration_minutes && (
+                            <span className="text-sm text-muted-foreground">
+                              {lesson.duration_minutes} min
+                            </span>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </details>
+              ))}
             </div>
           </div>
         </div>
