@@ -5,6 +5,7 @@ import { Menu, X, User, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { AccessibilityToggle } from '@/components/accessibility/AccessibilityToggle';
+import { LanguageSelector } from '@/components/language/LanguageSelector';
 import { Logo } from '@/components/brand/Logo';
 
 const navLinks = [
@@ -55,6 +56,11 @@ export function Header() {
 
           {/* Right Section */}
           <div className="flex items-center gap-3">
+            {/* Language Selector */}
+            <div className="hidden sm:block">
+              <LanguageSelector />
+            </div>
+
             {/* Accessibility Toggle */}
             <AccessibilityToggle />
 
