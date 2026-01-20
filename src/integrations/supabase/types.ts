@@ -312,6 +312,36 @@ export type Database = {
           },
         ]
       }
+      languages: {
+        Row: {
+          code: string
+          created_at: string
+          flag_emoji: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          native_name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          flag_emoji?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          native_name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          flag_emoji?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          native_name?: string
+        }
+        Relationships: []
+      }
       lesson_progress: {
         Row: {
           completed: boolean | null
@@ -355,6 +385,7 @@ export type Database = {
           description: string | null
           duration_minutes: number | null
           id: string
+          language: string | null
           module_id: string
           order_index: number
           title: string
@@ -367,6 +398,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           id?: string
+          language?: string | null
           module_id: string
           order_index?: number
           title: string
@@ -379,6 +411,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           id?: string
+          language?: string | null
           module_id?: string
           order_index?: number
           title?: string
