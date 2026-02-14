@@ -1,125 +1,132 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Layout } from '@/components/layout/Layout';
-import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Search, 
-  Filter, 
-  Clock, 
-  Users, 
-  Star, 
+import { Progress } from '@/components/ui/progress';
+import {
+  Search,
+  Clock,
+  Users,
+  Star,
   CheckCircle2,
-  Grid,
-  List,
-  BookOpen
+  BookOpen,
+  Play,
+  Youtube,
+  Loader2,
+  ExternalLink,
+  ChevronDown,
+  Trophy,
+  X,
+  ArrowRight,
 } from 'lucide-react';
+import { useYouTubePlaylists, YouTubePlaylist, YouTubeVideo, QuizQuestion } from '@/hooks/useYouTubePlaylists';
+import { useLanguage } from '@/contexts/LanguageContext';
 
-const categories = ['All', 'Technology', 'Business', 'Data', 'Design', 'Personal Development'];
-const levels = ['All Levels', 'Beginner', 'Intermediate', 'Advanced'];
-
-const courses = [
-  {
-    id: 'web-dev-101',
-    title: 'Web Development Fundamentals',
-    description: 'Master HTML, CSS, and JavaScript with full accessibility support and hands-on projects.',
-    instructor: 'Sarah Chen',
-    duration: '12 hours',
-    students: 3420,
-    rating: 4.9,
-    level: 'beginner',
-    category: 'Technology',
-    accessibilityFeatures: ['Captions', 'Sign Language', 'Audio Description'],
-    price: 'Free',
-  },
-  {
-    id: 'data-science-101',
-    title: 'Data Science for Everyone',
-    description: 'Learn data analysis with Python in an inclusive, beginner-friendly environment.',
-    instructor: 'Dr. James Miller',
-    duration: '20 hours',
-    students: 2180,
-    rating: 4.8,
-    level: 'intermediate',
-    category: 'Data',
-    accessibilityFeatures: ['Captions', 'Transcripts', 'Simplified Mode'],
-    price: '$49',
-  },
-  {
-    id: 'digital-marketing',
-    title: 'Digital Marketing Mastery',
-    description: 'Build marketing skills with adaptive learning paths and real-world case studies.',
-    instructor: 'Maria Garcia',
-    duration: '15 hours',
-    students: 4560,
-    rating: 4.9,
-    level: 'beginner',
-    category: 'Business',
-    accessibilityFeatures: ['Captions', 'Text Alternatives', 'Voice Navigation'],
-    price: '$39',
-  },
-  {
-    id: 'ux-design',
-    title: 'Accessible UX Design',
-    description: 'Learn to create inclusive user experiences that work for everyone.',
-    instructor: 'Alex Rivera',
-    duration: '18 hours',
-    students: 1890,
-    rating: 4.7,
-    level: 'intermediate',
-    category: 'Design',
-    accessibilityFeatures: ['Captions', 'Sign Language', 'Dyslexia Font'],
-    price: '$59',
-  },
-  {
-    id: 'python-basics',
-    title: 'Python Programming Basics',
-    description: 'Start your coding journey with Python, the most beginner-friendly language.',
-    instructor: 'David Kim',
-    duration: '16 hours',
-    students: 5230,
-    rating: 4.9,
-    level: 'beginner',
-    category: 'Technology',
-    accessibilityFeatures: ['Captions', 'Transcripts', 'Audio Description'],
-    price: 'Free',
-  },
-  {
-    id: 'leadership',
-    title: 'Leadership & Communication',
-    description: 'Develop essential leadership skills with inclusive communication techniques.',
-    instructor: 'Emma Watson',
-    duration: '10 hours',
-    students: 2340,
-    rating: 4.8,
-    level: 'beginner',
-    category: 'Personal Development',
-    accessibilityFeatures: ['Captions', 'Sign Language', 'Simplified Mode'],
-    price: '$29',
-  },
+const searchSuggestions = [
+  'Web Development Tutorial',
+  'Python Programming',
+  'Data Science Beginner',
+  'Machine Learning',
+  'React JS Course',
+  'Digital Marketing',
+  'UX Design',
+  'JavaScript Full Course',
 ];
 
-const levelColors = {
-  beginner: 'bg-success/10 text-success',
-  intermediate: 'bg-warning/10 text-warning-foreground',
-  advanced: 'bg-accent/10 text-accent',
-};
+// Local progress tracking
+function getProgress(): Record<string, boolean> {
+  try {
+    return JSON.parse(localStorage.getItem('yt_progress') || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function setProgress(videoId: string, completed: boolean) {
+  const p = getProgress();
+  p[videoId] = completed;
+  localStorage.setItem('yt_progress', JSON.stringify(p));
+}
+
+function getPlaylistProgress(videos: YouTubeVideo[]) {
+  const p = getProgress();
+  const completed = videos.filter(v => p[v.videoId]).length;
+  return { completed, total: videos.length, percent: videos.length > 0 ? Math.round((completed / videos.length) * 100) : 0 };
+}
 
 export default function CoursesPage() {
+  const { currentLanguage } = useLanguage();
+  const { playlists, loading, error, searchPlaylists, generateQuiz } = useYouTubePlaylists();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedLevel, setSelectedLevel] = useState('All Levels');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [hasSearched, setHasSearched] = useState(false);
+  const [expandedPlaylist, setExpandedPlaylist] = useState<string | null>(null);
 
-  const filteredCourses = courses.filter((course) => {
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || course.category === selectedCategory;
-    const matchesLevel = selectedLevel === 'All Levels' || 
-      course.level.toLowerCase() === selectedLevel.toLowerCase();
-    return matchesSearch && matchesCategory && matchesLevel;
-  });
+  // Quiz state
+  const [quizVideo, setQuizVideo] = useState<YouTubeVideo | null>(null);
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [score, setScore] = useState(0);
+  const [quizFinished, setQuizFinished] = useState(false);
+  const [_, setForceUpdate] = useState(0);
+
+  const handleSearch = async (query?: string) => {
+    const q = query || searchQuery;
+    if (!q.trim()) return;
+    setSearchQuery(q);
+    setHasSearched(true);
+    setExpandedPlaylist(null);
+    const langSuffix = currentLanguage !== 'en' ? ` ${currentLanguage}` : '';
+    await searchPlaylists(q + langSuffix, 6);
+  };
+
+  const openVideo = (video: YouTubeVideo) => {
+    window.open(`https://www.youtube.com/watch?v=${video.videoId}`, '_blank');
+    setProgress(video.videoId, true);
+    setForceUpdate(p => p + 1);
+  };
+
+  const startQuiz = async (video: YouTubeVideo) => {
+    setQuizVideo(video);
+    setQuizLoading(true);
+    setQuizQuestions([]);
+    setCurrentQuestion(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setScore(0);
+    setQuizFinished(false);
+
+    const questions = await generateQuiz(video.title, video.description);
+    setQuizQuestions(questions);
+    setQuizLoading(false);
+  };
+
+  const handleAnswer = (idx: number) => {
+    if (showResult) return;
+    setSelectedAnswer(idx);
+    setShowResult(true);
+    if (idx === quizQuestions[currentQuestion].correctIndex) {
+      setScore(s => s + 1);
+    }
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestion < quizQuestions.length - 1) {
+      setCurrentQuestion(c => c + 1);
+      setSelectedAnswer(null);
+      setShowResult(false);
+    } else {
+      setQuizFinished(true);
+    }
+  };
+
+  const closeQuiz = () => {
+    setQuizVideo(null);
+    setQuizQuestions([]);
+  };
 
   return (
     <Layout>
@@ -128,184 +135,321 @@ export default function CoursesPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl">
             <h1 className="text-4xl sm:text-5xl font-display font-bold mb-4">
-              Explore <span className="text-gradient">Accessible Courses</span>
+              Learn from <span className="text-gradient">YouTube Playlists</span>
             </h1>
-            <p className="text-lg text-muted-foreground">
-              All courses include comprehensive accessibility features. Learn at your own pace.
+            <p className="text-lg text-muted-foreground mb-8">
+              Search for any topic, watch curated playlists, track your progress, and test your knowledge with AI-generated quizzes after each video.
             </p>
-          </div>
-        </div>
-      </section>
 
-      {/* Filters */}
-      <section className="py-8 border-b border-border">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
             {/* Search */}
-            <div className="relative w-full lg:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" aria-hidden="true" />
-              <Input
-                type="search"
-                placeholder="Search courses..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-                aria-label="Search courses"
-              />
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search YouTube playlists..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                  className="pl-10 h-12 text-base"
+                  aria-label="Search YouTube playlists"
+                />
+              </div>
+              <Button onClick={() => handleSearch()} size="lg" disabled={loading} className="h-12">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Search'}
+              </Button>
             </div>
 
-            <div className="flex flex-wrap gap-4 items-center">
-              {/* Category Filter */}
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="bg-background border border-input rounded-lg px-3 py-2 text-sm"
-                  aria-label="Filter by category"
-                >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Level Filter */}
-              <select
-                value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value)}
-                className="bg-background border border-input rounded-lg px-3 py-2 text-sm"
-                aria-label="Filter by level"
-              >
-                {levels.map((level) => (
-                  <option key={level} value={level}>{level}</option>
+            {/* Suggestions */}
+            {!hasSearched && (
+              <div className="flex flex-wrap gap-2 mt-4">
+                {searchSuggestions.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => handleSearch(s)}
+                    className="px-3 py-1.5 rounded-full text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    {s}
+                  </button>
                 ))}
-              </select>
-
-              {/* View Toggle */}
-              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-background shadow-sm' : ''}`}
-                  aria-label="Grid view"
-                  aria-pressed={viewMode === 'grid'}
-                >
-                  <Grid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm' : ''}`}
-                  aria-label="List view"
-                  aria-pressed={viewMode === 'list'}
-                >
-                  <List className="w-4 h-4" />
-                </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Course Grid */}
-      <section className="section-padding" aria-labelledby="courses-results">
+      {/* Results */}
+      <section className="section-padding">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 id="courses-results" className="sr-only">Course Results</h2>
-          <p className="text-muted-foreground mb-8">
-            Showing {filteredCourses.length} of {courses.length} courses
-          </p>
+          {error && (
+            <div className="bg-destructive/10 text-destructive p-4 rounded-lg mb-6">
+              {error}
+            </div>
+          )}
 
-          <div className={viewMode === 'grid' 
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' 
-            : 'flex flex-col gap-6'
-          }>
-            {filteredCourses.map((course, index) => (
-              <motion.article
-                key={course.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
-                className={viewMode === 'grid' 
-                  ? 'card-interactive overflow-hidden' 
-                  : 'card-interactive flex gap-6 items-start'
-                }
-              >
-                <Link to={`/courses/${course.id}`} className={viewMode === 'grid' ? 'block' : 'flex gap-6 flex-1'}>
-                  {/* Thumbnail */}
-                  <div className={`relative bg-muted rounded-lg overflow-hidden ${viewMode === 'grid' ? 'aspect-video mb-4' : 'w-48 h-32 flex-shrink-0'}`}>
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <BookOpen className="w-12 h-12 text-primary/50" />
-                    </div>
-                    <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium ${levelColors[course.level as keyof typeof levelColors]}`}>
-                      {course.level}
-                    </span>
-                    {course.price === 'Free' && (
-                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium bg-success text-success-foreground">
-                        Free
-                      </span>
-                    )}
-                  </div>
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+              <p className="text-muted-foreground">Searching YouTube playlists...</p>
+            </div>
+          )}
 
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <span>{course.category}</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {course.duration}
-                      </span>
-                    </div>
-
-                    <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">
-                      {course.title}
-                    </h3>
-                    
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {course.description}
-                    </p>
-
-                    {/* Accessibility Features */}
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {course.accessibilityFeatures.map((feature) => (
-                        <span
-                          key={feature}
-                          className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full"
-                        >
-                          <CheckCircle2 className="w-3 h-3" />
-                          {feature}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-border">
-                      <span className="text-sm text-muted-foreground">By {course.instructor}</span>
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <Users className="w-3.5 h-3.5" />
-                          {course.students.toLocaleString()}
-                        </span>
-                        <span className="flex items-center gap-1 text-secondary">
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          {course.rating}
-                        </span>
-                        <span className="font-semibold text-primary">{course.price}</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              </motion.article>
-            ))}
-          </div>
-
-          {filteredCourses.length === 0 && (
+          {!loading && hasSearched && playlists.length === 0 && (
             <div className="text-center py-16">
-              <BookOpen className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
-              <h3 className="font-semibold text-lg mb-2">No courses found</h3>
-              <p className="text-muted-foreground">Try adjusting your search or filters.</p>
+              <Youtube className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+              <h3 className="font-semibold text-lg mb-2">No playlists found</h3>
+              <p className="text-muted-foreground">Try a different search term.</p>
+            </div>
+          )}
+
+          {!loading && playlists.length > 0 && (
+            <>
+              <p className="text-muted-foreground mb-6">
+                Found {playlists.length} playlists for "{searchQuery}"
+              </p>
+
+              <div className="space-y-6">
+                {playlists.map((playlist, idx) => {
+                  const prog = getPlaylistProgress(playlist.videos);
+                  const isExpanded = expandedPlaylist === playlist.playlistId;
+
+                  return (
+                    <motion.article
+                      key={playlist.playlistId}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="card-interactive overflow-hidden"
+                    >
+                      {/* Playlist header */}
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="relative w-full sm:w-64 flex-shrink-0">
+                          <img
+                            src={playlist.thumbnail}
+                            alt={playlist.title}
+                            className="w-full aspect-video object-cover rounded-lg"
+                          />
+                          <span className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-0.5 rounded">
+                            {playlist.videoCount} videos
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-lg mb-1 line-clamp-2">{playlist.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-2">{playlist.channelTitle}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{playlist.description}</p>
+
+                          {/* Progress */}
+                          {prog.completed > 0 && (
+                            <div className="mb-3">
+                              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                <span>{prog.completed}/{prog.total} completed</span>
+                                <span>{prog.percent}%</span>
+                              </div>
+                              <Progress value={prog.percent} className="h-1.5" />
+                            </div>
+                          )}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setExpandedPlaylist(isExpanded ? null : playlist.playlistId)}
+                          >
+                            {isExpanded ? 'Hide' : 'View'} Lessons
+                            <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Expanded videos */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="mt-4 pt-4 border-t border-border space-y-2">
+                              {playlist.videos.map((video, vIdx) => {
+                                const isWatched = getProgress()[video.videoId];
+                                return (
+                                  <div
+                                    key={video.videoId}
+                                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                                      isWatched ? 'bg-success/10' : 'hover:bg-muted/50'
+                                    }`}
+                                  >
+                                    <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
+                                      isWatched ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                      {isWatched ? <CheckCircle2 className="w-4 h-4" /> : vIdx + 1}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm line-clamp-1">{video.title}</p>
+                                      <p className="text-xs text-muted-foreground">{video.channelTitle}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => startQuiz(video)}
+                                        className="text-xs"
+                                      >
+                                        <BookOpen className="w-3.5 h-3.5 mr-1" />
+                                        Quiz
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => openVideo(video)}
+                                      >
+                                        <Play className="w-3.5 h-3.5 mr-1" />
+                                        Watch
+                                        <ExternalLink className="w-3 h-3 ml-1" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.article>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {!hasSearched && !loading && (
+            <div className="text-center py-16">
+              <Youtube className="w-20 h-20 text-primary/30 mx-auto mb-4" />
+              <h3 className="font-semibold text-xl mb-2">Search for a topic to get started</h3>
+              <p className="text-muted-foreground">
+                Find YouTube playlists, track your learning progress, and take quizzes after each video.
+              </p>
             </div>
           )}
         </div>
       </section>
+
+      {/* Quiz Modal */}
+      <AnimatePresence>
+        {quizVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+            onClick={closeQuiz}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-card rounded-xl border border-border max-w-lg w-full max-h-[90vh] overflow-y-auto p-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="font-display font-bold text-lg">Video Quiz</h2>
+                  <p className="text-sm text-muted-foreground line-clamp-1">{quizVideo.title}</p>
+                </div>
+                <button onClick={closeQuiz} className="p-1 hover:bg-muted rounded-md">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {quizLoading && (
+                <div className="flex flex-col items-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
+                  <p className="text-muted-foreground text-sm">Generating quiz from video content...</p>
+                </div>
+              )}
+
+              {!quizLoading && quizQuestions.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Could not generate quiz. Try again.</p>
+                  <Button className="mt-4" onClick={() => startQuiz(quizVideo)}>Retry</Button>
+                </div>
+              )}
+
+              {!quizLoading && quizQuestions.length > 0 && !quizFinished && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm text-muted-foreground">
+                      Question {currentQuestion + 1} of {quizQuestions.length}
+                    </span>
+                    <span className="text-sm font-medium text-primary">Score: {score}</span>
+                  </div>
+                  <Progress value={((currentQuestion + 1) / quizQuestions.length) * 100} className="h-1.5 mb-6" />
+
+                  <p className="font-semibold mb-4">{quizQuestions[currentQuestion].question}</p>
+
+                  <div className="space-y-2">
+                    {quizQuestions[currentQuestion].options.map((opt, i) => {
+                      let variant = 'outline' as const;
+                      let extraClass = '';
+                      if (showResult) {
+                        if (i === quizQuestions[currentQuestion].correctIndex) {
+                          extraClass = 'border-success bg-success/10 text-success';
+                        } else if (i === selectedAnswer) {
+                          extraClass = 'border-destructive bg-destructive/10 text-destructive';
+                        }
+                      }
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleAnswer(i)}
+                          disabled={showResult}
+                          className={`w-full text-left p-3 rounded-lg border transition-colors ${extraClass || 'border-border hover:bg-muted/50'} ${
+                            selectedAnswer === i && !showResult ? 'border-primary bg-primary/10' : ''
+                          }`}
+                        >
+                          <span className="font-medium mr-2">{String.fromCharCode(65 + i)}.</span>
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {showResult && (
+                    <div className="mt-4">
+                      <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                        {quizQuestions[currentQuestion].explanation}
+                      </p>
+                      <Button className="mt-3 w-full" onClick={nextQuestion}>
+                        {currentQuestion < quizQuestions.length - 1 ? 'Next Question' : 'See Results'}
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {quizFinished && (
+                <div className="text-center py-6">
+                  <Trophy className={`w-16 h-16 mx-auto mb-4 ${score >= quizQuestions.length * 0.7 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+                  <h3 className="font-display font-bold text-2xl mb-1">
+                    {score} / {quizQuestions.length}
+                  </h3>
+                  <p className="text-muted-foreground mb-2">
+                    {score >= quizQuestions.length * 0.7 ? 'Great job! You passed!' : 'Keep learning and try again.'}
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    {Math.round((score / quizQuestions.length) * 100)}% correct
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <Button variant="outline" onClick={closeQuiz}>Close</Button>
+                    <Button onClick={() => startQuiz(quizVideo)}>Retake Quiz</Button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Layout>
   );
 }
