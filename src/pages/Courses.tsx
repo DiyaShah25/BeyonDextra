@@ -6,9 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
   Search,
-  Clock,
-  Users,
-  Star,
   CheckCircle2,
   BookOpen,
   Play,
@@ -83,10 +80,17 @@ export default function CoursesPage() {
     await searchPlaylists(q + langSuffix, 6);
   };
 
+  // Video player state
+  const [playingVideo, setPlayingVideo] = useState<YouTubeVideo | null>(null);
+
   const openVideo = (video: YouTubeVideo) => {
-    window.open(`https://www.youtube.com/watch?v=${video.videoId}`, '_blank');
+    setPlayingVideo(video);
     setProgress(video.videoId, true);
     setForceUpdate(p => p + 1);
+  };
+
+  const closeVideo = () => {
+    setPlayingVideo(null);
   };
 
   const startQuiz = async (video: YouTubeVideo) => {
@@ -446,6 +450,53 @@ export default function CoursesPage() {
                   </div>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Video Player Modal */}
+      <AnimatePresence>
+        {playingVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={closeVideo}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-4xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold line-clamp-1 flex-1 mr-4">{playingVideo.title}</h3>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`https://www.youtube.com/watch?v=${playingVideo.videoId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/70 hover:text-white text-sm flex items-center gap-1"
+                  >
+                    Open on YouTube <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <button onClick={closeVideo} className="text-white/70 hover:text-white p-1">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="aspect-video rounded-lg overflow-hidden bg-black">
+                <iframe
+                  src={`https://www.youtube.com/embed/${playingVideo.videoId}?autoplay=1`}
+                  title={playingVideo.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              </div>
             </motion.div>
           </motion.div>
         )}
