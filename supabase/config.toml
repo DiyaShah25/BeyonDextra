@@ -2,3 +2,9 @@ project_id = "yzdljhjdzbddwjsmmubb"
 
 [functions.ai-chat]
 verify_jwt = false
+
+[functions.youtube-playlists]
+verify_jwt = false
+
+[functions.generate-video-quiz]
+verify_jwt = false
