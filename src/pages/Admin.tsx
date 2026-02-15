@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, BookOpen, BarChart3, Settings, Shield, Bell,
@@ -6,11 +6,14 @@ import {
   Search, Filter, Download, Upload, MoreVertical,
   UserCheck, UserX, GraduationCap, MessageSquare, AlertTriangle
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/AuthContext';
+
 
 const statsCards = [
   { label: 'Total Users', value: '12,847', change: '+12%', trend: 'up', icon: Users },
@@ -42,6 +45,26 @@ const alerts = [
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('overview');
+  const { user, role, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && (!user || role !== 'admin')) {
+      navigate('/dashboard');
+    }
+  }, [user, role, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!user || role !== 'admin') return null;
 
   return (
     <Layout>

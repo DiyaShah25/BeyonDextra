@@ -32,8 +32,18 @@ serve(async (req) => {
 
     const { text, voiceId = 'EXAVITQu4vr4xnSDxMaL' } = await req.json();
     
-    if (!text) {
-      throw new Error('Text is required');
+    if (!text || typeof text !== 'string' || text.trim().length === 0 || text.length > 5000) {
+      return new Response(
+        JSON.stringify({ error: 'Text must be between 1-5000 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (typeof voiceId !== 'string' || !/^[a-zA-Z0-9]{10,30}$/.test(voiceId)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid voice ID' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('TTS request for text length:', text.length);
