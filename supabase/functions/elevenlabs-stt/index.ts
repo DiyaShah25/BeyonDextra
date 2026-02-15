@@ -34,7 +34,18 @@ serve(async (req) => {
     const audioFile = formData.get('audio') as File;
     
     if (!audioFile) {
-      throw new Error('Audio file is required');
+      return new Response(
+        JSON.stringify({ error: 'Audio file is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (audioFile.size > MAX_FILE_SIZE) {
+      return new Response(
+        JSON.stringify({ error: 'Audio file must be under 10MB' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('STT request for audio file:', audioFile.name, 'size:', audioFile.size);

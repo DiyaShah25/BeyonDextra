@@ -24,12 +24,14 @@ Deno.serve(async (req) => {
 
     const { videoTitle, videoDescription } = await req.json();
 
-    if (!videoTitle) {
+    if (!videoTitle || typeof videoTitle !== 'string' || videoTitle.trim().length === 0 || videoTitle.length > 500) {
       return new Response(
-        JSON.stringify({ error: 'Video title is required' }),
+        JSON.stringify({ error: 'Video title must be between 1-500 characters' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const safeDescription = typeof videoDescription === 'string' ? videoDescription.slice(0, 2000) : '';
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -42,7 +44,7 @@ Deno.serve(async (req) => {
     const prompt = `Generate exactly 5 multiple-choice quiz questions based on this YouTube video:
 
 Title: "${videoTitle}"
-Description: "${videoDescription || 'No description available'}"
+Description: "${safeDescription || 'No description available'}"
 
 Each question should test understanding of the topic covered in the video. Return ONLY valid JSON in this exact format, no markdown, no explanation:
 [

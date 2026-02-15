@@ -24,9 +24,17 @@ Deno.serve(async (req) => {
 
     const { query, maxResults = 5 } = await req.json();
 
-    if (!query) {
+    if (!query || typeof query !== 'string' || query.trim().length === 0 || query.length > 200) {
       return new Response(
-        JSON.stringify({ error: 'Query is required' }),
+        JSON.stringify({ error: 'Query must be a string between 1-200 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const maxResultsNum = typeof maxResults === 'number' ? maxResults : parseInt(String(maxResults), 10);
+    if (isNaN(maxResultsNum) || maxResultsNum < 1 || maxResultsNum > 25) {
+      return new Response(
+        JSON.stringify({ error: 'maxResults must be between 1-25' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -40,7 +48,7 @@ Deno.serve(async (req) => {
     }
 
     // Search for playlists
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=playlist&q=${encodeURIComponent(query)}&maxResults=${maxResults}&key=${apiKey}`;
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=playlist&q=${encodeURIComponent(query)}&maxResults=${maxResultsNum}&key=${apiKey}`;
     const searchRes = await fetch(searchUrl);
     const searchData = await searchRes.json();
 
