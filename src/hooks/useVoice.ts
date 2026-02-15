@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -16,6 +17,8 @@ export function useVoice() {
 
     setIsPlaying(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || SUPABASE_KEY;
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/elevenlabs-tts`,
         {
@@ -23,7 +26,7 @@ export function useVoice() {
           headers: {
             'Content-Type': 'application/json',
             'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ text }),
         }
@@ -110,13 +113,16 @@ export function useVoice() {
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.webm');
 
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token || SUPABASE_KEY;
+
           const response = await fetch(
             `${SUPABASE_URL}/functions/v1/elevenlabs-stt`,
             {
               method: 'POST',
               headers: {
                 'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Authorization': `Bearer ${token}`,
               },
               body: formData,
             }
