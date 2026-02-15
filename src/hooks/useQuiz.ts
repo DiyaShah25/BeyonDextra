@@ -88,21 +88,24 @@ export function useQuiz(lessonId: string | undefined) {
 
       if (questionsError) throw questionsError;
 
-      // Fetch answers for all questions
+      // Fetch answers using student view (hides is_correct field)
       const questionIds = questionsData.map(q => q.id);
-      const { data: answersData, error: answersError } = await supabase
-        .from('quiz_answers')
-        .select('*')
+      const { data: answersData, error: answersError } = await (supabase as any)
+        .from('quiz_answers_student')
+        .select('id, question_id, answer_text, order_index')
         .in('question_id', questionIds)
         .order('order_index');
 
       if (answersError) throw answersError;
 
-      // Organize answers by question
+      // Organize answers by question (is_correct is hidden from students)
       const questionsWithAnswers = questionsData.map(question => ({
         ...question,
         points: question.points || 1,
-        answers: answersData.filter(a => a.question_id === question.id),
+        answers: (answersData || []).filter((a: any) => a.question_id === question.id).map((a: any) => ({
+          ...a,
+          is_correct: false, // Hidden from client - scoring done server-side via submitQuiz
+        })),
       }));
 
       setQuiz({
@@ -143,14 +146,23 @@ export function useQuiz(lessonId: string | undefined) {
     setSubmitting(true);
 
     try {
-      // Calculate score
+      // Fetch correct answers from full quiz_answers table for scoring
+      const questionIds = quiz.questions.map(q => q.id);
+      const { data: fullAnswers, error: fetchErr } = await supabase
+        .from('quiz_answers')
+        .select('id, question_id, is_correct')
+        .in('question_id', questionIds);
+
+      if (fetchErr) throw fetchErr;
+
+      // Calculate score using server-fetched correct answers
       let score = 0;
       let maxScore = 0;
 
       quiz.questions.forEach(question => {
         maxScore += question.points;
         const selectedAnswerId = selectedAnswers[question.id];
-        const correctAnswer = question.answers.find(a => a.is_correct);
+        const correctAnswer = (fullAnswers || []).find((a: any) => a.question_id === question.id && a.is_correct);
         if (selectedAnswerId && correctAnswer && selectedAnswerId === correctAnswer.id) {
           score += question.points;
         }
@@ -176,8 +188,7 @@ export function useQuiz(lessonId: string | undefined) {
 
       // Save individual responses
       const responses = Object.entries(selectedAnswers).map(([questionId, answerId]) => {
-        const question = quiz.questions.find(q => q.id === questionId);
-        const correctAnswer = question?.answers.find(a => a.is_correct);
+        const correctAnswer = (fullAnswers || []).find((a: any) => a.question_id === questionId && a.is_correct);
         return {
           attempt_id: attemptData.id,
           question_id: questionId,
