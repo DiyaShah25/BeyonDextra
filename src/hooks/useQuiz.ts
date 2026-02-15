@@ -146,63 +146,31 @@ export function useQuiz(lessonId: string | undefined) {
     setSubmitting(true);
 
     try {
-      // Fetch correct answers from full quiz_answers table for scoring
-      const questionIds = quiz.questions.map(q => q.id);
-      const { data: fullAnswers, error: fetchErr } = await supabase
-        .from('quiz_answers')
-        .select('id, question_id, is_correct')
-        .in('question_id', questionIds);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('No session token');
 
-      if (fetchErr) throw fetchErr;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-      // Calculate score using server-fetched correct answers
-      let score = 0;
-      let maxScore = 0;
-
-      quiz.questions.forEach(question => {
-        maxScore += question.points;
-        const selectedAnswerId = selectedAnswers[question.id];
-        const correctAnswer = (fullAnswers || []).find((a: any) => a.question_id === question.id && a.is_correct);
-        if (selectedAnswerId && correctAnswer && selectedAnswerId === correctAnswer.id) {
-          score += question.points;
-        }
-      });
-
-      const passed = (score / maxScore) * 100 >= quiz.passing_score;
-
-      // Create or update attempt
-      const { data: attemptData, error: attemptError } = await supabase
-        .from('quiz_attempts')
-        .upsert({
-          user_id: user.id,
+      const response = await fetch(`${supabaseUrl}/functions/v1/submit-quiz`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
           quiz_id: quiz.id,
-          score,
-          max_score: maxScore,
-          passed,
-          completed_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (attemptError) throw attemptError;
-
-      // Save individual responses
-      const responses = Object.entries(selectedAnswers).map(([questionId, answerId]) => {
-        const correctAnswer = (fullAnswers || []).find((a: any) => a.question_id === questionId && a.is_correct);
-        return {
-          attempt_id: attemptData.id,
-          question_id: questionId,
-          selected_answer_id: answerId,
-          is_correct: correctAnswer?.id === answerId,
-        };
+          selected_answers: selectedAnswers,
+        }),
       });
 
-      if (responses.length > 0) {
-        await supabase.from('quiz_responses').insert(responses);
-      }
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to submit quiz');
 
-      setAttempt(attemptData);
-      return { error: null, score, maxScore, passed };
+      setAttempt(result.attempt);
+      return { error: null, score: result.score, maxScore: result.maxScore, passed: result.passed };
     } catch (err) {
       console.error('Error submitting quiz:', err);
       return { error: 'Failed to submit quiz' };
