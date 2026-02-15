@@ -43,13 +43,33 @@ serve(async (req) => {
     }
 
     const { message, conversationId, messages: previousMessages } = await req.json();
-    console.log('Received request:', { message, conversationId, userId: user.id });
+
+    // Input validation
+    if (!message || typeof message !== 'string' || message.trim().length === 0 || message.length > 10000) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Message must be between 1-10000 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (previousMessages && (!Array.isArray(previousMessages) || previousMessages.length > 50)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Conversation history must be an array of at most 50 messages' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Received request:', { messageLength: message.length, conversationId, userId: user.id });
 
     // Build conversation history for context
-    const conversationHistory = previousMessages?.map((msg: { role: string; content: string }) => ({
-      role: msg.role,
-      content: msg.content,
-    })) || [];
+    const conversationHistory = (previousMessages || [])
+      .filter((msg: { role: string; content: string }) => 
+        msg && typeof msg.role === 'string' && typeof msg.content === 'string' && msg.content.length <= 10000
+      )
+      .map((msg: { role: string; content: string }) => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      }));
 
     // Add the new message
     conversationHistory.push({
