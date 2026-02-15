@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layout } from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
@@ -53,9 +54,26 @@ function getPlaylistProgress(videos: YouTubeVideo[]) {
 }
 
 export default function CoursesPage() {
+  const [searchParams] = useSearchParams();
   const { currentLanguage } = useLanguage();
   const { playlists, loading, error, searchPlaylists, generateQuiz } = useYouTubePlaylists();
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Auto-search from query param (e.g. from home page topic chips)
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) {
+      setSearchQuery(q);
+      handleSearchFromParam(q);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSearchFromParam = async (q: string) => {
+    setHasSearched(true);
+    setExpandedPlaylist(null);
+    const langSuffix = currentLanguage !== 'en' ? ` ${currentLanguage}` : '';
+    await searchPlaylists(q + langSuffix, 6);
+  };
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedPlaylist, setExpandedPlaylist] = useState<string | null>(null);
 
